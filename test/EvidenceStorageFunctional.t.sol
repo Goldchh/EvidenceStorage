@@ -2,7 +2,9 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
+import "../script/DeployEvidenceStorage.s.sol";
 import "../src/EvidenceStorage.sol";
+
 
 contract EvidenceStorageFunctionalTest is Test {
     EvidenceStorage public evidenceStorage;
@@ -19,7 +21,10 @@ contract EvidenceStorageFunctionalTest is Test {
     uint256 public constant EVIDENCE_COUNT =  5;
 
     function setUp() public {
-        evidenceStorage = new EvidenceStorage();
+       
+        DeployEvidenceStorage deployer = new DeployEvidenceStorage();
+        evidenceStorage = deployer.run();
+
     }
 
 
@@ -156,7 +161,7 @@ contract EvidenceStorageFunctionalTest is Test {
     function testEvidenceCreatedEvent() public {
         // 期望事件触发
         vm.expectEmit(true, true, false, true);
-        emit EvidenceStorage.EvidenceCreated(0, TEST_USER, SAMPLE_CONTENT, block.timestamp);
+        emit EvidenceStorage.EvidenceCreated(0, TEST_USER, keccak256(abi.encodePacked(SAMPLE_CONTENT)), block.timestamp);
         
         createSingleEvidence();
     }
@@ -198,7 +203,7 @@ contract EvidenceStorageFunctionalTest is Test {
         
         // 验证特定存证内容
         verifyEvidenceContent(0, TEST_USER, "User1 Evidence");
-        verifyEvidenceContent(3, TEST_USER, "Evidence 0");
+        verifyEvidenceContent(3, TEST_USER, "Evidence 0");  
         verifyEvidenceContent(6, TEST_USER, "");
     }
 
