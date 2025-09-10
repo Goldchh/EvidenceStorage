@@ -4,11 +4,12 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../script/DeployEvidenceStorage.s.sol";
 import "../src/EvidenceStorage.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 
 contract EvidenceStorageFunctionalTest is Test {
     EvidenceStorage public evidenceStorage;
-// 测试用户地址
+    // 测试用户地址
     address public constant TEST_USER = address(0x1);
     address public constant ANOTHER_USER = address(0x2);
     address public constant THIRD_USER = address(0x3);
@@ -22,8 +23,8 @@ contract EvidenceStorageFunctionalTest is Test {
 
     function setUp() public {
        
-        DeployEvidenceStorage deployer = new DeployEvidenceStorage();
-        evidenceStorage = deployer.run();
+        //DeployEvidenceStorage deployer = new DeployEvidenceStorage();
+        evidenceStorage = new EvidenceStorage();
 
     }
 
@@ -31,43 +32,52 @@ contract EvidenceStorageFunctionalTest is Test {
     // 基础测试数据：单个用户单个存证
     function createSingleEvidence() internal {
         vm.prank(TEST_USER);
-        evidenceStorage.createEvidence(SAMPLE_CONTENT);
+        evidenceStorage.createEvidence(generateHashFromString(SAMPLE_CONTENT));
     }
 
      // 多用户测试数据：3个用户各1个存证
     function createMultiUserEvidences() internal {
+        console.log("createMultiUserEvidences-------");
         vm.prank(TEST_USER);
-        evidenceStorage.createEvidence("User1 Evidence");
+      
+        evidenceStorage.createEvidence(generateHashFromString("User1 Evidence"));
         
         vm.prank(ANOTHER_USER);
-        evidenceStorage.createEvidence("User2 Evidence");
+        evidenceStorage.createEvidence(generateHashFromString("User2 Evidence"));
         
         vm.prank(THIRD_USER);
-        evidenceStorage.createEvidence("User3 Evidence");
+        evidenceStorage.createEvidence(generateHashFromString("User3 Evidence"));
     }
     
      // 单用户多存证数据：一个用户多个存证
 
     function createUserWithMultipleEvidences(address user, uint256 count) internal {
+        console.log("createEdgeCaseEvidences-------");
         for (uint256 i = 0; i < count; i++) {
             vm.prank(user);
-            evidenceStorage.createEvidence(string(abi.encodePacked("Evidence ", i)));
+            string memory evidenceContent = string(abi.encodePacked("Evidence ", Strings.toString(i)));
+            bytes32 contentHash = keccak256(bytes(evidenceContent));
+            evidenceStorage.createEvidence(contentHash);
         }
     }
 
      // 边界情况测试数据
     function createEdgeCaseEvidences() internal {
+        console.log("createEdgeCaseEvidences-------");
         // 空内容
         vm.prank(TEST_USER);
-        evidenceStorage.createEvidence(EMPTY_CONTENT);
+        evidenceStorage.createEvidence(generateHashFromString(EMPTY_CONTENT));
         
         // 长内容
         vm.prank(ANOTHER_USER);
-        evidenceStorage.createEvidence(LONG_CONTENT);
+        evidenceStorage.createEvidence(generateHashFromString(LONG_CONTENT));
         
         // 特殊字符
         vm.prank(THIRD_USER);
-        evidenceStorage.createEvidence("Special!@#$%^&*()_+{}|:<>?[];',./");
+        evidenceStorage.createEvidence(generateHashFromString("Special!@#$%^&*()_+{}|:<>?[];',./"));
+        
+        console.logBytes32(generateHashFromString("Special!@#$%^&*()_+{}|:<>?[];',./"));
+
     }
 
     // 完整测试环境：组合所有数据
@@ -77,14 +87,17 @@ contract EvidenceStorageFunctionalTest is Test {
         createEdgeCaseEvidences();
     }
 
-
+    function generateHashFromString(string memory _str) public pure returns (bytes32) {
+        // 方法1: 使用 abi.encodePacked 将字符串打包编码为 bytes
+        return keccak256(abi.encodePacked(_str));
+    }
     // 验证存证内容
     function verifyEvidenceContent(uint256 evidenceId, address expectedCreator, string memory expectedContent) internal view {
-        (address creator, string memory content, uint256 timestamp) = evidenceStorage.getEvidence(evidenceId);
-        // console.log(abi.encodePacked("Verifying Evidence ID: ", evidenceId));
-        console.log("Content:", content);
+        (address creator, bytes32 contentHash, uint256 timestamp) = evidenceStorage.getEvidence(evidenceId);
+        bytes32 expectedContentHash = keccak256(abi.encodePacked(expectedContent));
+
         assertEq(creator, expectedCreator, "Creator mismatch");
-        assertEq(content, expectedContent, "Content mismatch");
+        assertEq(contentHash, expectedContentHash, "Content mismatch");
         assertGt(timestamp, 0, "Timestamp should be positive");
         
     }
@@ -138,7 +151,7 @@ contract EvidenceStorageFunctionalTest is Test {
         
         // 验证内容
         for (uint256 i = 0; i < evidenceCount; i++) {
-            verifyEvidenceContent(i, TEST_USER, string(abi.encodePacked("Evidence ", i)));
+            verifyEvidenceContent(i, TEST_USER, string(abi.encodePacked("Evidence ", Strings.toString(i))));
         }
     }
 
@@ -202,8 +215,11 @@ contract EvidenceStorageFunctionalTest is Test {
         verifyUserEvidenceCount(THIRD_USER, 2);
         
         // 验证特定存证内容
+       
         verifyEvidenceContent(0, TEST_USER, "User1 Evidence");
+        
         verifyEvidenceContent(3, TEST_USER, "Evidence 0");  
+        
         verifyEvidenceContent(6, TEST_USER, "");
     }
 

@@ -18,26 +18,25 @@ contract EvidenceStorage {
 
     struct Evidence {
         address creator;   
-        string content;
         uint256 timestamp;
-        bytes32 hashCode;
+        bytes32 contentHash;
     }
 
     Evidence[] public evidences;
+    // 核心修改：用户级唯一性检查映射
+    // 格式：userUsedHashes[用户地址][文件哈希] => 是否已存证 (true/false)
+    mapping(address => mapping(bytes32=>bool)) public userUsedHashes;
+
     mapping(address => uint256[]) public userEvidences;
-    mapping(bytes32 => bool) private _existingHashes;
     
     event EvidenceCreated(uint256 indexed evidenceId, address indexed creator, bytes32 contentHash,uint256 timestamp);
     //创建存证
-    function createEvidence(string calldata content) public {
-        content.validateContent();
-        bytes32 contentHash = content.generateHash(); 
-        require(!_existingHashes[contentHash], "Duplicate content");
+    function createEvidence(bytes32  _contentHash) public {
+        require(!userUsedHashes[msg.sender][_contentHash], "You have already stored evidence for this file content. Operation not allowed.");
         evidences.push(Evidence({
             creator:msg.sender,
-            content:content,
             timestamp:block.timestamp,
-            hashCode:contentHash
+            contentHash:_contentHash
         }));
 
         
@@ -45,9 +44,9 @@ contract EvidenceStorage {
         // 将存证ID添加到用户的存证列表中
         userEvidences[msg.sender].push(evidenceId);
 
-         _existingHashes[contentHash] = true;
+        userUsedHashes[msg.sender][_contentHash] = true;
 
-        emit EvidenceCreated(evidenceId, msg.sender, contentHash, block.timestamp);
+        emit EvidenceCreated(evidenceId, msg.sender, _contentHash, block.timestamp);
 
     }
 
@@ -62,10 +61,10 @@ contract EvidenceStorage {
         return userEvidences[user].length;
     }
     
-    function getEvidence(uint256 evidenceId) public view returns (address, string memory, uint256) {
+    function getEvidence(uint256 evidenceId) public view returns (address, bytes32 , uint256) {
         require(evidenceId < evidences.length, "Evidence does not exist");
         Evidence memory evidence = evidences[evidenceId];
-        return (evidence.creator, evidence.content, evidence.timestamp);
+        return (evidence.creator, evidence.contentHash, evidence.timestamp);
     }
     
     function getUserEvidenceIds(address user) public view returns (uint256[] memory) {
