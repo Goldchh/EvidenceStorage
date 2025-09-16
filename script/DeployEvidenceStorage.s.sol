@@ -7,7 +7,7 @@ contract DeployEvidenceStorage is Script {
 
     function run() external returns (EvidenceStorage){
         vm.startBroadcast();
-        EvidenceStorage evidenceStorage = new EvidenceStorage();
+        EvidenceStorage evidenceStorage = new EvidenceStorage(msg.sender);
         vm.stopBroadcast();
         return evidenceStorage;
     }
